@@ -76,7 +76,31 @@ The optimization moved the system from "Unstable" to "Reliable":
 *   **Cost Approximation:** The database lacks a `Cost` column. We assume `CostOfGoods ≈ 0.7 * UnitPrice` for Gross Margin calculations.
 *   **Local Compute Constraint:** The system is designed for `Phi-3.5-mini` (3.8B). This required breaking the prompt into smaller, distinct steps (Planner → SQL) rather than a single large prompt, as smaller models struggle with complex, multi-step reasoning in one pass.
 
-## 5. Setup & Usage
+---
+
+## 5. Project Structure
+
+```bash
+├── agent/
+│   ├── graph_hybrid.py       # Main LangGraph application logic & state definition
+│   ├── dspy_signatures.py    # DSPy signatures for Router, SQL Generator, and Synthesizer
+│   ├── optimize_sql.py       # The training script used to compile the SQL module
+│   ├── dspy_dataset.py       # Handcrafted training examples (Golden Set)
+│   ├── sql_optimized.json    # The compiled/optimized DSPy program (saved state)
+│   ├── rag/retrieval.py                  # Retrieval logic (BM25/TF-IDF)
+│   └── tools/sqlite_tool.py                # SQLite connection and introspection tools
+├── data/
+│   └── northwind.sqlite      # The local database (create this folder and download data before using the project)
+├── docs/                     # Markdown knowledge base for RAG
+├── inputs/                   # Evaluation datasets
+├── outputs/                  # Generated responses
+├── run_agent_hybrid.py       # CLI Entrypoint
+└── requirements.txt
+```
+
+
+
+## 6. Setup & Usage
 
 ### Prerequisites
 *   Python 3.10+
