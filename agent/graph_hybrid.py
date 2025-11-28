@@ -1,4 +1,5 @@
 import json
+import os
 import urllib.request
 import re
 from typing import TypedDict, List, Dict, Any
@@ -6,7 +7,34 @@ from langgraph.graph import StateGraph, END
 from agent.tools.sqlite_tool import SQLiteTool
 from agent.rag.retrieval import Retriever
 
+import dspy
+from agent.dspy_signatures import GenerateSQL
+
 MODEL = "phi3.5:3.8b-mini-instruct-q4_K_M"
+
+lm = dspy.LM(
+    model="ollama/phi3.5:3.8b-mini-instruct-q4_K_M", 
+    api_base="http://localhost:11434", 
+    api_key="",
+    temperature=0.0,
+    num_ctx=6144
+)
+dspy.configure(lm=lm)
+
+# Load the optimized SQL module
+OPTIMIZED_SQL_PATH = "agent/sql_optimized.json"
+if os.path.exists(OPTIMIZED_SQL_PATH):
+    compiled_sql_module = dspy.Predict(GenerateSQL)
+    compiled_sql_module.load(OPTIMIZED_SQL_PATH)
+    USE_DSPY_SQL = True
+else:
+    compiled_sql_module = dspy.Predict(GenerateSQL)  
+    USE_DSPY_SQL = True  
+
+# Initialize DB Tool
+db_tool = SQLiteTool()
+schema_info = db_tool.get_schema()
+
 
 #  Minimal Ollama Client 
 def query_ollama(messages: List[Dict[str, str]], model: str = "phi3.5:3.8b-mini-instruct-q4_K_M", temperature: float = 0.0) -> str:
@@ -200,9 +228,60 @@ def clean_sql(text: str) -> str:
 
 
 
-def generate_sql_standard(plan: str, schema: str, prev_error: str = None, prev_sql: str = None) -> str:
+def nl2sql_node(state: AgentState):
     """
-    Ultra-Short Prompt to prevent context overflow and hallucinations.
+    NL2SQL Node - Now using DSPy Optimized Module
+    """
+    print("--- Node: NL2SQL (DSPy Optimized) ---")
+    
+    question = state["question"]
+    plan = state["sql_plan"]
+    
+    prev_error = None
+    prev_sql = None
+    if state.get("sql_result") and not state.get("sql_valid"):
+        print(f"   [Repairing] Attempt {state['attempt_count'] + 1}")
+        prev_error = state["sql_result"]
+        prev_sql = state["sql_query"]
+    
+    # Build plan_constraints string (same format as training data)
+    # Add error context if this is a repair attempt
+    plan_with_context = plan
+    if prev_error and prev_sql:
+        plan_with_context = f"""{plan}
+
+### FIX ERROR
+SQL: {prev_sql}
+ERROR: {prev_error}
+
+HINT: Check Joins and Column Names."""
+    
+    try:
+        # Use DSPy module
+        result = compiled_sql_module(
+            question=question,
+            schema_context=schema_info,
+            plan_constraints=plan_with_context
+        )
+        
+        raw_response = result.sql_query
+        
+    except Exception as e:
+        print(f"   [DSPy Error]: {e}")
+        print("   [Fallback]: Using raw SQL generation")
+        # Fallback to raw generation if DSPy fails
+        raw_response = generate_sql_fallback(plan_with_context)
+    
+    sql_query = clean_sql(raw_response)
+    print(f"DEBUG [NL2SQL]: \n{sql_query}")
+    
+    return {"sql_query": sql_query}
+
+
+def generate_sql_fallback(plan: str) -> str:
+    """
+    Fallback SQL generation if DSPy fails.
+    Uses exact same prompt as DSPy signature.
     """
     system_instruction = """You are a SQLite Expert.
 
@@ -230,9 +309,6 @@ Return raw SQL only.
 {plan}
 """
 
-    if prev_error:
-        user_message += f"\n### FIX ERROR\nSQL: {prev_sql}\nERROR: {prev_error}\n\nHINT: Check Joins and Column Names."
-
     messages = [
         {"role": "system", "content": system_instruction},
         {"role": "user", "content": user_message}
@@ -240,27 +316,7 @@ Return raw SQL only.
     
     return query_ollama(messages, model=MODEL, temperature=0.0)
 
-def nl2sql_node(state: AgentState):
-    print("--- Node: NL2SQL ---")
-    
-    plan = state["sql_plan"]
-    
-    prev_error = None
-    prev_sql = None
-    if state.get("sql_result") and not state.get("sql_valid"):
-        print(f"   [Repairing] Attempt {state['attempt_count'] + 1}")
-        prev_error = state["sql_result"]
-        prev_sql = state["sql_query"]
-    
-    db_tool = SQLiteTool()
-    schema_text = db_tool.get_schema()
-    
-    raw_response = generate_sql_standard(plan, schema_text, prev_error, prev_sql)
-    
-    sql_query = clean_sql(raw_response)
-    print(f"DEBUG [NL2SQL]: \n{sql_query}")
-    
-    return {"sql_query": sql_query}
+
 
 
 def executor_node(state: AgentState):

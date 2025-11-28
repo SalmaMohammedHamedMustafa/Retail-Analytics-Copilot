@@ -1,0 +1,56 @@
+{
+  "traces": [],
+  "train": [],
+  "demos": [
+    {
+      "augmented": true,
+      "question": "Revenue from Beverages in summer 2017 (June-August)?",
+      "plan_constraints": "TIME_SCOPE: 2017-06 to 2017-08, RANKING_INTENT: None, FILTERS: Category = 'Beverages'",
+      "schema_context": "--- DATABASE TIMEFRAME: 2012-07-10 15:40:46 to 2023-10-28 00:09:48 ---\nNOTE: The database contains data shifted +20 years from the original 1997 dataset.\n(e.g., 1997-06-01 in docs = 2017-06-01 in DB)\n\nTable orders has columns: OrderID, CustomerID, EmployeeID, OrderDate, RequiredDate, ShippedDate, ShipVia, Freight, ShipName, ShipAddress, ShipCity, ShipRegion, ShipPostalCode, ShipCountry\nTable order_items has columns: OrderID, ProductID, UnitPrice, Quantity, Discount\nTable products has columns: ProductID, ProductName, SupplierID, CategoryID, QuantityPerUnit, UnitPrice, UnitsInStock, UnitsOnOrder, ReorderLevel, Discontinued\nTable customers has columns: CustomerID, CompanyName, ContactName, ContactTitle, Address, City, Region, PostalCode, Country, Phone, Fax\nTable Categories has columns: CategoryID, CategoryName, Description, Picture",
+      "sql_query": "SELECT SUM(oi.UnitPrice * oi.Quantity) AS Revenue FROM orders o JOIN order_items oi ON oi.OrderID = o.OrderID JOIN products p ON oi.ProductID = p.ProductID JOIN categories c ON p.CategoryID = c.CategoryID WHERE c.CategoryName = 'Beverages' AND strftime('%Y-%m', o.OrderDate) BETWEEN '2017-06' AND '2017-08'"
+    },
+    {
+      "augmented": true,
+      "question": "Total quantity of Beverages sold in June 2017?",
+      "plan_constraints": "TIME_SCOPE: 2017-06, RANKING_INTENT: None, FILTERS: Category = 'Beverages'",
+      "schema_context": "--- DATABASE TIMEFRAME: 2012-07-10 15:40:46 to 2023-10-28 00:09:48 ---\nNOTE: The database contains data shifted +20 years from the original 1997 dataset.\n(e.g., 1997-06-01 in docs = 2017-06-01 in DB)\n\nTable orders has columns: OrderID, CustomerID, EmployeeID, OrderDate, RequiredDate, ShippedDate, ShipVia, Freight, ShipName, ShipAddress, ShipCity, ShipRegion, ShipPostalCode, ShipCountry\nTable order_items has columns: OrderID, ProductID, UnitPrice, Quantity, Discount\nTable products has columns: ProductID, ProductName, SupplierID, CategoryID, QuantityPerUnit, UnitPrice, UnitsInStock, UnitsOnOrder, ReorderLevel, Discontinued\nTable customers has columns: CustomerID, CompanyName, ContactName, ContactTitle, Address, City, Region, PostalCode, Country, Phone, Fax\nTable Categories has columns: CategoryID, CategoryName, Description, Picture",
+      "sql_query": "SELECT SUM(oi.Quantity) AS TotalQuantity FROM orders o JOIN order_items oi ON oi.OrderID = o.OrderID JOIN products p ON oi.ProductID = p.ProductID JOIN categories c ON p.CategoryID = c.CategoryID WHERE c.CategoryName = 'Beverages' AND strftime('%Y-%m', o.OrderDate) = '2017-06'"
+    },
+    {
+      "augmented": true,
+      "question": "Give me the total sales of Beverages.",
+      "plan_constraints": "TIME_SCOPE: ALL_TIME, RANKING_INTENT: None, FILTERS: Category = 'Beverages'",
+      "schema_context": "--- DATABASE TIMEFRAME: 2012-07-10 15:40:46 to 2023-10-28 00:09:48 ---\nNOTE: The database contains data shifted +20 years from the original 1997 dataset.\n(e.g., 1997-06-01 in docs = 2017-06-01 in DB)\n\nTable orders has columns: OrderID, CustomerID, EmployeeID, OrderDate, RequiredDate, ShippedDate, ShipVia, Freight, ShipName, ShipAddress, ShipCity, ShipRegion, ShipPostalCode, ShipCountry\nTable order_items has columns: OrderID, ProductID, UnitPrice, Quantity, Discount\nTable products has columns: ProductID, ProductName, SupplierID, CategoryID, QuantityPerUnit, UnitPrice, UnitsInStock, UnitsOnOrder, ReorderLevel, Discontinued\nTable customers has columns: CustomerID, CompanyName, ContactName, ContactTitle, Address, City, Region, PostalCode, Country, Phone, Fax\nTable Categories has columns: CategoryID, CategoryName, Description, Picture",
+      "sql_query": "SELECT SUM(oi.UnitPrice * oi.Quantity) AS TotalSales FROM orders o JOIN order_items oi ON oi.OrderID = o.OrderID JOIN products p ON oi.ProductID = p.ProductID JOIN categories c ON p.CategoryID = c.CategoryID WHERE c.CategoryName = 'Beverages'"
+    }
+  ],
+  "signature": {
+    "instructions": "You are a SQLite Expert.\n\n### SCHEMA (LOWERCASE VIEWS)\n- orders (o): OrderID, CustomerID, OrderDate (YYYY-MM-DD)\n- order_items (oi): OrderID, ProductID, UnitPrice, Quantity, Discount\n- products (p): ProductID, ProductName, CategoryID (**NO CategoryName**)\n- categories (c): CategoryID, CategoryName (**CategoryName is HERE**)\n- customers (cust): CustomerID, CompanyName\n\n### CRITICAL RULES\n1. **Join Orders:** ALWAYS `JOIN orders o ON oi.OrderID = o.OrderID` to filter by Date.\n2. **Join Categories:** To filter by \"CategoryName\", you MUST `JOIN categories c ON p.CategoryID = c.CategoryID`.\n3. **Dates:** Use `>=` and `<=`. **NEVER** use `BETWEEN`.\n4. **Grouping:**\n   - If Plan says \"Top X\": `GROUP BY` the entity.\n   - If Plan says \"None\": **DO NOT GROUP BY**. `SELECT SUM(...)`.\n\n### FORMAT\nReturn raw SQL only. No markdown.",
+    "fields": [
+      {
+        "prefix": "Question:",
+        "description": "The user's business question"
+      },
+      {
+        "prefix": "Schema Context:",
+        "description": "Schema info (usually implied, but kept for context)"
+      },
+      {
+        "prefix": "Plan Constraints:",
+        "description": "The execution plan: Time Scope, Intent, Filters, Formulas"
+      },
+      {
+        "prefix": "Sql Query:",
+        "description": "Valid SQLite query string"
+      }
+    ]
+  },
+  "lm": null,
+  "metadata": {
+    "dependency_versions": {
+      "python": "3.12",
+      "dspy": "3.0.4",
+      "cloudpickle": "3.1"
+    }
+  }
+}
